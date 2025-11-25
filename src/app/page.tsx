@@ -1,3 +1,4 @@
+// nisudev/new-task-manager/NisuDev-new-task-manager-3225873f3c07d5794b38fee3028b29fb4d12e05f/src/app/page.tsx
 // src/app/page.tsx
 'use client' 
 
@@ -59,9 +60,9 @@ export default function LoginPage() {
 
 
     return (
-        <div className="flex items-center justify-center min-h-screen bg-gray-100">
-            <div className="w-full max-w-md p-6 bg-white rounded-lg shadow-xl">
-                <h2 className="text-2xl font-bold text-center text-gray-800 mb-6">Task Manager Login</h2>
+        <div className="flex items-center justify-center min-h-screen bg-gray-50 text-slate-900">
+            <div className="w-full max-w-sm p-6 bg-white rounded-xl shadow-lg border border-gray-200">
+                <h2 className="text-2xl font-bold text-slate-900 text-center mb-6">Task Manager Login</h2>
                 
                 {/* Contenido envuelto en un FORM para un manejo correcto del submit */}
                 <form onSubmit={handleLogin}> 
@@ -75,7 +76,7 @@ export default function LoginPage() {
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
                             placeholder="ejemplo@correo.com"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                            className="w-full px-3 py-2 border border-gray-300 bg-white rounded-lg text-slate-900 placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
                             disabled={loading}
                         />
                     </div>
@@ -89,7 +90,7 @@ export default function LoginPage() {
                             id="password"
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                            className="w-full px-3 py-2 border border-gray-300 bg-white rounded-lg text-slate-900 placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
                             disabled={loading}
                         />
                     </div>
@@ -97,17 +98,16 @@ export default function LoginPage() {
                     <div className="text-center">
                         <button
                             type="submit" 
-                            className="w-full px-4 py-2 text-lg font-semibold text-white bg-blue-600 rounded-md shadow-md hover:bg-blue-700 transition-colors disabled:bg-gray-400"
+                            className="w-full px-4 py-2 text-lg font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors shadow-md disabled:bg-gray-400"
                             disabled={loading}
                         >
-                            {loading ? 'Cargando...' : 'Login'}
+                            {loading ? 'Cargando...' : 'Iniciar Sesión'}
                         </button>
                     </div>
                 </form>
 
                 <div className="mt-4 text-center">
-                  {/* Añadir este botón */}
-                  <button onClick={() => router.push('/signup')} className="text-sm text-green-600 hover:text-green-500">
+                  <button onClick={() => router.push('/signup')} className="text-sm font-medium text-green-600 hover:text-green-500 transition-colors">
                       ¿No tienes cuenta? Regístrate aquí.
                   </button>
               </div>

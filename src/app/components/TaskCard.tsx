@@ -1,3 +1,4 @@
+// nisudev/new-task-manager/NisuDev-new-task-manager-3225873f3c07d5794b38fee3028b29fb4d12e05f/src/app/components/TaskCard.tsx
 // src/components/TaskCard.tsx
 import React, { useState } from 'react';
 import { Task, Interval } from '@/types';
@@ -8,6 +9,44 @@ interface TaskCardProps {
     onUpdate: (date: string) => void;
     currentDate: string;
 }
+
+// Sub-component for clean time input rendering
+interface TimeInputProps {
+    label: string;
+    hValue: string;
+    mValue: string;
+    onHChange: (value: string) => void;
+    onMChange: (value: string) => void;
+}
+
+const TimeInput: React.FC<TimeInputProps> = ({ label, hValue, mValue, onHChange, onMChange }) => {
+    // Inputs claros y limpios
+    const timeInputStyle = "w-14 p-2 text-center border bg-gray-50 border-gray-300 rounded-lg text-slate-900 font-mono text-lg focus:ring-indigo-500 focus:border-indigo-500 transition-colors";
+    
+    return (
+        <div>
+            <h5 className="text-center text-sm mb-2 text-gray-600">{label}</h5>
+            <div className="flex justify-center space-x-2">
+                <input 
+                    type="text" 
+                    maxLength={2} 
+                    value={hValue} 
+                    onChange={(e) => onHChange(e.target.value.replace(/[^0-9]/g, ''))} 
+                    className={timeInputStyle} 
+                />
+                <span className="font-bold text-xl text-gray-500">:</span>
+                <input 
+                    type="text" 
+                    maxLength={2} 
+                    value={mValue} 
+                    onChange={(e) => onMChange(e.target.value.replace(/[^0-9]/g, ''))} 
+                    className={timeInputStyle} 
+                />
+            </div>
+        </div>
+    );
+}
+
 
 const TaskCard: React.FC<TaskCardProps> = ({ task, onUpdate, currentDate }) => {
     const [isEditing, setIsEditing] = useState(false);
@@ -140,103 +179,124 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onUpdate, currentDate }) => {
         }
     };
 
+    // Estilos sobrios
+    const inputStyle = "w-full p-2 border bg-gray-50 border-gray-300 rounded-lg text-slate-900 focus:ring-indigo-500 focus:border-indigo-500 transition-colors";
+    const iconStyle = "w-5 h-5 text-gray-500 hover:text-indigo-600 transition-colors";
+
+
+    // Estilo de tarjeta simple, fondo blanco, borde izquierdo para destacar tipo/estado.
     const taskColor = task.TYPE === 'SOPORTE' 
-        ? (task.JOINED ? 'bg-pink-200 border-l-8 border-pink-500' : 'bg-pink-100')
-        : (task.JOINED ? 'bg-green-200 border-l-8 border-green-500' : 'bg-green-100');
+        ? (task.JOINED 
+            ? 'border-l-4 border-pink-500' 
+            : 'border-l-4 border-pink-300'
+        )
+        : (task.JOINED 
+            ? 'border-l-4 border-green-500' 
+            : 'border-l-4 border-green-300'
+        );
+
 
     return (
-        <div className="flex flex-row gap-4 p-4 border rounded-xl shadow-lg bg-white">
+        <div className="flex flex-row gap-4 p-4 border border-gray-200 rounded-xl bg-white text-slate-900 shadow-md">
             
             {/* 1. Tarjeta Principal (TASK) */}
-            <div className={`flex-shrink-0 w-1/2 p-4 rounded-lg shadow-md ${taskColor}`}>
+            <div className={`flex-shrink-0 w-1/2 p-4 rounded-lg bg-gray-50 ${taskColor}`}>
                 
-                <div className="flex justify-between mb-2 text-xl">
-                    <i onClick={() => setIsEditing(!isEditing)} className="cursor-pointer">
-                        {isEditing ? '❌' : '✏️'}
-                    </i>
-                    {isEditing && (
-                        <div className='flex space-x-3'>
-                            <i onClick={handleSaveModify} className="cursor-pointer">💾</i>
-                            <i onClick={() => handleDeleteTask(task.ID)} className="cursor-pointer">🗑️</i>
-                        </div>
-                    )}
+                <div className="flex justify-between items-start mb-4">
+                    
+                    {/* Control Icons */}
+                    <div className="flex space-x-3 text-lg">
+                        <i onClick={() => setIsEditing(!isEditing)} className={`cursor-pointer ${iconStyle} ${isEditing ? 'text-red-600' : ''}`} title={isEditing ? 'Cancelar edición' : 'Editar tarea'}>
+                            {isEditing ? '✖️' : '✏️'}
+                        </i>
+                        {isEditing && (
+                            <>
+                                <i onClick={handleSaveModify} className={`cursor-pointer text-green-600 hover:text-green-500 transition-colors`} title='Guardar cambios'>💾</i>
+                                <i onClick={() => handleDeleteTask(task.ID)} className={`cursor-pointer text-red-600 hover:text-red-500 transition-colors`} title='Eliminar tarea'>🗑️</i>
+                            </>
+                        )}
+                    </div>
+                    
+                    {/* Total Minutes Display (Chip discreto) */}
+                    <p className="text-lg font-semibold px-2 py-0.5 bg-indigo-100 text-indigo-800 rounded">
+                        {task.totalMinutes} Min
+                    </p>
                 </div>
 
-                <div className='pb-4'>
-                    <p className="text-lg font-semibold text-gray-700">{task.totalMinutes} Minutos</p> 
+                <div className='pb-4 space-y-2'>
                     
                     {!isEditing && (
                         <div>
-                            <h3 className="text-2xl font-bold">{task.TITLE}</h3>
-                            <p className="text-gray-600">{task.DESCRIPTION}</p>
+                            <h3 className="text-xl font-bold mb-1">{task.TITLE}</h3>
+                            <p className="text-gray-600 text-sm">{task.DESCRIPTION}</p>
+                            <p className="text-xs font-mono mt-1 text-gray-500">APLICANTE: {task.APPLICANT}</p>
                         </div>
                     )}
                     
                     {isEditing && (
                         <div className="space-y-3">
-                            <label className="block text-sm font-medium">Titulo</label>
-                            <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} className="w-full p-2 border rounded"/>
-                            <label className="block text-sm font-medium">Descripción</label>
-                            <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} className="w-full p-2 border rounded"/>
+                            <div>
+                                <label className="block text-xs font-medium mb-1 text-gray-600">Título</label>
+                                <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} className={inputStyle}/>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium mb-1 text-gray-600">Descripción</label>
+                                <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} className={inputStyle}/>
+                            </div>
                         </div>
                     )}
                 </div>
                 
-                <div className="flex items-center mt-3">
-                    <input type="checkbox" checked={task.JOINED} onChange={handleJoinedToggle} className="w-5 h-5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500" id={`joined-${task.ID}`}/>
-                    <label htmlFor={`joined-${task.ID}`} className="ml-2 text-gray-900">
+                {/* JOINED Toggle */}
+                <div className="flex items-center pt-3 border-t border-gray-200">
+                    <input type="checkbox" checked={task.JOINED} onChange={handleJoinedToggle} className="w-4 h-4 text-indigo-600 bg-white border-gray-300 rounded focus:ring-indigo-500 cursor-pointer" id={`joined-${task.ID}`}/>
+                    <label htmlFor={`joined-${task.ID}`} className="ml-2 text-sm font-medium text-slate-800">
                         Ingresado
                     </label>
                 </div>
             </div>
 
             {/* 2. Lista de Intervalos */}
-            <div className="flex flex-wrap gap-3 w-1/4 max-h-96 overflow-y-auto">
+            <div className="w-1/4 space-y-2 max-h-72 overflow-y-auto pr-2">
+                <h5 className="font-semibold text-gray-700 border-b border-gray-200 pb-1 sticky top-0 bg-white z-10 text-sm">Intervalos ({task.intervals.length})</h5>
                 {task.intervals.length > 0 ? (
-                    task.intervals.map(interval => (
-                        <div key={interval.ID} className="w-full p-3 text-center bg-gray-50 rounded-lg shadow-inner">
-                            <p className="text-xs text-gray-500">INICIO</p>
-                            <h5 className="font-semibold">{interval.TIME_START.substring(0, 5)}</h5>
-                            <p className="text-xs text-gray-500">TÉRMINO</p>
-                            <h5 className="font-semibold">{interval.TIME_END.substring(0, 5)}</h5>
-                            <div className="my-2 p-1 bg-white rounded">
-                                <h4 className="font-bold">{interval.DIFF} Min</h4>
+                    task.intervals
+                        .sort((a, b) => a.ID - b.ID)
+                        .map(interval => (
+                            <div key={interval.ID} className="flex justify-between items-center p-2 bg-gray-50 border border-gray-200 rounded-lg text-xs transition-colors hover:border-indigo-500">
+                                <span className="text-indigo-600 font-mono">
+                                    {interval.TIME_START.substring(0, 5)} - {interval.TIME_END.substring(0, 5)}
+                                </span>
+                                <div className='flex items-center space-x-2'>
+                                    <span className="font-semibold text-slate-900 bg-gray-200 px-1 py-0.5 rounded-sm">
+                                        {interval.DIFF} Min
+                                    </span>
+                                    <button 
+                                        onClick={() => handleDeleteInterval(interval.ID)} 
+                                        className="text-red-600 hover:text-red-500 transition-colors"
+                                        title="Eliminar Intervalo"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                                    </button>
+                                </div>
                             </div>
-                            <button onClick={() => handleDeleteInterval(interval.ID)} className="text-red-500 hover:text-red-700 text-2xl">
-                                 - 
-                            </button>
-                        </div>
-                    ))
-                ) : (<p className="text-sm text-gray-400">Sin intervalos.</p>)}
+                        ))
+                ) : (<p className="text-xs text-gray-500 p-2">Sin intervalos.</p>)}
             </div>
 
             {/* 3. Panel de Agregar Intervalo */}
-            <div className="flex-shrink-0 w-1/4 p-4 border-2 border-dashed border-gray-300 rounded-lg bg-white space-y-4">
-                <h5 className="text-center font-bold">Agregar Intervalo</h5>
+            <div className="flex-shrink-0 w-1/4 p-4 border-2 border-dashed border-gray-300 rounded-xl bg-white space-y-4 shadow-inner">
+                <h5 className="text-center font-bold text-base text-indigo-600 border-b border-gray-200 pb-2">Añadir Intervalo</h5>
                 
                 {/* Inputs de Hora Inicio */}
-                <div>
-                    <h5 className="text-center text-sm mb-1">Hora Inicio</h5>
-                    <div className="flex justify-center space-x-1">
-                        <input type="text" maxLength={2} value={hStart} onChange={(e) => setHStart(e.target.value)} className="w-12 p-1 text-center border rounded" />
-                        <span className="font-bold">:</span>
-                        <input type="text" maxLength={2} value={mStart} onChange={(e) => setMStart(e.target.value)} className="w-12 p-1 text-center border rounded" />
-                    </div>
-                </div>
+                <TimeInput label="Inicio (HH:MM)" hValue={hStart} mValue={mStart} onHChange={setHStart} onMChange={setMStart} />
 
                 {/* Inputs de Hora Término */}
-                <div>
-                    <h5 className="text-center text-sm mb-1">Hora Termino</h5>
-                    <div className="flex justify-center space-x-1">
-                        <input type="text" maxLength={2} value={hEnd} onChange={(e) => setHEnd(e.target.value)} className="w-12 p-1 text-center border rounded" />
-                        <span className="font-bold">:</span>
-                        <input type="text" maxLength={2} value={mEnd} onChange={(e) => setMEnd(e.target.value)} className="w-12 p-1 text-center border rounded" />
-                    </div>
-                </div>
+                <TimeInput label="Término (HH:MM)" hValue={hEnd} mValue={mEnd} onHChange={setHEnd} onMChange={setMEnd} />
                 
                 {/* Botón Agregar */}
                 <div className="text-center pt-2">
-                    <button onClick={handleAddInterval} className="w-10 h-10 bg-green-500 text-white rounded-full text-2xl font-bold hover:bg-green-600">
+                    <button onClick={handleAddInterval} className="w-10 h-10 bg-indigo-600 text-white rounded-full text-xl font-bold hover:bg-indigo-700 transition-colors shadow-md">
                         +
                     </button>
                 </div>

@@ -1,3 +1,4 @@
+// nisudev/new-task-manager/NisuDev-new-task-manager-3225873f3c07d5794b38fee3028b29fb4d12e05f/src/app/signup/page.tsx
 // src/app/signup/page.tsx
 'use client' 
 
@@ -77,9 +78,9 @@ export default function SignUpPage() {
     };
 
     return (
-        <div className="flex items-center justify-center min-h-screen bg-gray-100">
-            <div className="w-full max-w-md p-6 bg-white rounded-lg shadow-xl">
-                <h2 className="text-2xl font-bold text-center text-gray-800 mb-6">Registro de Nuevo Usuario</h2>
+        <div className="flex items-center justify-center min-h-screen bg-gray-50 text-slate-900">
+            <div className="w-full max-w-sm p-6 bg-white rounded-xl shadow-lg border border-gray-200">
+                <h2 className="text-2xl font-bold text-slate-900 text-center mb-6">Registro de Nuevo Usuario</h2>
                 
                 <div className="mb-4">
                     <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
@@ -91,7 +92,7 @@ export default function SignUpPage() {
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         placeholder="ejemplo@correo.com"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-green-500 focus:border-green-500"
+                        className="w-full px-3 py-2 border border-gray-300 bg-white rounded-lg text-slate-900 placeholder-gray-400 focus:outline-none focus:ring-green-500 focus:border-green-500 transition-colors"
                         disabled={loading}
                     />
                 </div>
@@ -105,7 +106,7 @@ export default function SignUpPage() {
                         id="password"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-green-500 focus:border-green-500"
+                        className="w-full px-3 py-2 border border-gray-300 bg-white rounded-lg text-slate-900 placeholder-gray-400 focus:outline-none focus:ring-green-500 focus:border-green-500 transition-colors"
                         disabled={loading}
                     />
                 </div>
@@ -113,7 +114,7 @@ export default function SignUpPage() {
                 <div className="text-center">
                     <button
                         onClick={handleSignup}
-                        className="w-full px-4 py-2 text-lg font-semibold text-white bg-green-600 rounded-md shadow-md hover:bg-green-700 transition-colors disabled:bg-gray-400"
+                        className="w-full px-4 py-2 text-lg font-semibold text-white bg-green-600 rounded-lg hover:bg-green-700 transition-colors shadow-md disabled:bg-gray-400"
                         disabled={loading}
                     >
                         {loading ? 'Registrando...' : 'Registrarme'}
@@ -121,7 +122,7 @@ export default function SignUpPage() {
                 </div>
                 
                 <div className="mt-4 text-center">
-                    <button onClick={() => router.push('/')} className="text-sm text-blue-600 hover:text-blue-500">
+                    <button onClick={() => router.push('/')} className="text-sm font-medium text-indigo-600 hover:text-indigo-500 transition-colors">
                         ¿Ya tienes cuenta? Inicia sesión aquí.
                     </button>
                 </div>
