@@ -3,7 +3,7 @@
 
 import React, { useState } from 'react';
 import { supabase } from '@/lib/supabase'; // Asegúrate de que la ruta sea correcta
-import { useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation'; // <-- CORREGIDO: Usar 'from' en lugar de '='
 
 export default function SignUpPage() {
     const [email, setEmail] = useState('');
@@ -19,26 +19,55 @@ export default function SignUpPage() {
 
         setLoading(true);
         try {
-            // Usa signUp para crear un nuevo usuario en Supabase Auth
+            // 1. Usa signUp para crear un nuevo usuario en Supabase Auth
             const { 
-                data, 
-                error 
+                data: authData,
+                error: authError
             } = await supabase.auth.signUp({ 
                 email: email, 
                 password: password 
             });
 
-            if (error) {
-                alert('Error al registrar usuario: ' + error.message);
-            } else if (data.user && data.session) {
-                // Usuario creado y logueado (si la configuración de Supabase lo permite)
-                alert('¡Registro exitoso! Redirigiendo a tareas...');
-                router.push('/tasks'); 
-            } else if (data.user && !data.session) {
-                // Usuario creado, pero necesita confirmar email (configuración por defecto de Supabase)
-                alert('¡Registro exitoso! Por favor, revisa tu correo electrónico para confirmar tu cuenta antes de iniciar sesión.');
-                router.push('/'); // Redirige al login
+            if (authError) {
+                alert('Error al registrar usuario en Auth: ' + authError.message);
+                return;
             }
+            
+            if (authData.user) {
+                // NOTA IMPORTANTE: La tabla 'user' en tu esquema (SERIAL ID, USER_NAME, PASSWORD)
+                // no está diseñada para guardar el UUID de Auth o el email de forma segura.
+                // Insertaremos los datos para que "se guarde algo", pero
+                // considera actualizar el esquema de tu tabla 'user' a un formato de perfil con UUID.
+                
+                // 2. Insertar una entrada en la tabla 'user' (Tu tabla de datos)
+                // Asumiendo que quieres guardar el email en el campo USER_NAME
+                const { error: userTableError } = await supabase
+                    .from('user') 
+                    .insert({ 
+                        // Guardamos el email en USER_NAME
+                        USER_NAME: email, 
+                        // Guardamos un placeholder, ya que la contraseña real está en Auth
+                        PASSWORD: 'Supabase-Managed-Password-Hash' 
+                    });
+                
+                if (userTableError) {
+                    console.error("Error al crear perfil en la DB (tabla 'user'):", userTableError);
+                    alert('Registro exitoso en Auth, pero falló la creación del perfil en la DB: ' + userTableError.message);
+                    return;
+                }
+
+                // 3. Manejar la redirección
+                 if (authData.session) {
+                    // Usuario creado y logueado (si la configuración de Supabase lo permite)
+                    alert('¡Registro y perfil creados! Redirigiendo a tareas...');
+                    router.push('/tasks'); 
+                } else {
+                    // Usuario creado, pero necesita confirmar email (configuración por defecto de Supabase)
+                    alert('¡Registro y perfil creados! Por favor, revisa tu correo electrónico para confirmar tu cuenta antes de iniciar sesión.');
+                    router.push('/'); // Redirige al login
+                }
+            }
+
         } catch (e) {
             console.error("Signup failed", e);
             alert('Ocurrió un error inesperado al intentar registrarse.');
