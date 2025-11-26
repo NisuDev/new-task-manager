@@ -156,7 +156,6 @@ const TaskCard = ({ task, onUpdate, currentDate }: TaskCardProps) => {
             await taskToDelete.destroy();
             console.log("[DELETE] Tarea eliminada con éxito.");
 
-            alert('Tarea eliminada con éxito.');
             onUpdate(currentDate); 
             
         } catch (error: any) {
@@ -176,7 +175,6 @@ const TaskCard = ({ task, onUpdate, currentDate }: TaskCardProps) => {
             await intervalToDelete.destroy();
             console.log("[DELETE] Intervalo eliminado con éxito.");
 
-            alert('Intervalo eliminado con éxito.');
             onUpdate(currentDate); 
             
         } catch (error: any) {
@@ -267,13 +265,16 @@ const TaskCard = ({ task, onUpdate, currentDate }: TaskCardProps) => {
     // Estilos sobrios
     const inputStyle = "w-full p-2 border bg-gray-50 border-gray-300 rounded-lg text-slate-900 focus:ring-indigo-500 focus:border-indigo-500 transition-colors";
 
-    // Estilo de tarjeta: fondo blanco, borde izquierdo para destacar tipo/estado.
-    const typeColor = task.TYPE === 'SOPORTE' ? 'pink' : 'green';
+    // CORRECCIÓN: Usar lógica condicional explícita para evitar problemas con clases dinámicas en Tailwind JIT.
+    const isSoporte = task.TYPE === 'SOPORTE';
 
-    // NEW: Visual feedback for JOINED status (darker background and stronger border)
-    const taskStatusStyle = task.JOINED 
-        ? `bg-${typeColor}-100 border-l-4 border-${typeColor}-600 shadow-md` // Highlighted when JOINED
-        : `bg-gray-50 border-l-4 border-${typeColor}-300`; // Subtle when not JOINED
+    const taskStatusStyle = task.JOINED
+        ? isSoporte
+            ? 'bg-pink-100 border-l-4 border-pink-600 shadow-md' // SOPORTE, JOINED
+            : 'bg-green-100 border-l-4 border-green-600 shadow-md' // TAREA, JOINED
+        : isSoporte
+            ? 'bg-gray-50 border-l-4 border-pink-300' // SOPORTE, NOT JOINED
+            : 'bg-gray-50 border-l-4 border-green-300'; // TAREA, NOT JOINED
 
 
     return (
@@ -351,7 +352,7 @@ const TaskCard = ({ task, onUpdate, currentDate }: TaskCardProps) => {
                         checked={task.JOINED} 
                         onChange={handleJoinedToggle} 
                         // Note: Tailwind requires full class strings to be present, using the defined colors
-                        className={`w-4 h-4 text-indigo-600 bg-white border-gray-300 rounded focus:ring-indigo-500 cursor-pointer checked:bg-${typeColor}-500 checked:border-transparent`} 
+                        className={`w-4 h-4 text-indigo-600 bg-white border-gray-300 rounded focus:ring-indigo-500 cursor-pointer ${isSoporte ? 'checked:bg-pink-500' : 'checked:bg-green-500'} checked:border-transparent`} 
                         id={`joined-${task.ID}`}
                     />
                     <label htmlFor={`joined-${task.ID}`} className="ml-2 text-sm font-medium text-slate-800">

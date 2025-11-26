@@ -320,14 +320,14 @@ const TimeSummary: React.FC<TimeSummaryProps> = ({ totalMinutes }) => {
         <div className="flex justify-center mb-8">
             <div className="flex space-x-3 items-center text-sm md:text-base">
                 
-                <div className={`${baseStyle} text-green-700`}>
+                <div className={`${baseStyle} text-slate-900`}>
                     <p className="text-xs font-normal text-gray-500">Trabajado</p>
                     <p className="mt-1">{formatMinutes(totalMinutes)}</p>
                 </div>
                 
                 <span className="text-gray-500">-</span>
                 
-                <div className={`${baseStyle} text-gray-700`}>
+                <div className={`${baseStyle} text-slate-900`}>
                     <p className="text-xs font-normal text-gray-500">Meta (9.5h)</p>
                     <p className="mt-1">{formatMinutes(DAILY_TARGET_MINUTES)}</p>
                 </div>

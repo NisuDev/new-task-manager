@@ -1,36 +1,42 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Task Manager App
 
-## Getting Started
+## Descripción
 
-First, run the development server:
+Esta es una aplicación de gestión de tareas creada con Next.js y Back4App. Permite a los usuarios registrarse, iniciar sesión y gestionar sus tareas diarias. La aplicación está diseñada para ser intuitiva y fácil de usar, con una interfaz limpia y moderna.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## Características
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+*   **Autenticación de usuarios:** Los usuarios pueden crear una cuenta y iniciar sesión.
+*   **Gestión de tareas:** Los usuarios pueden crear, ver, actualizar y eliminar tareas.
+*   **Seguimiento del tiempo:** Los usuarios pueden realizar un seguimiento del tiempo dedicado a cada tarea.
+*   **Interfaz de usuario moderna:** La aplicación utiliza componentes de React para una experiencia de usuario fluida.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Tecnologías utilizadas
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+*   **Next.js:** Un framework de React para crear aplicaciones web.
+*   **Back4App:** Un backend como servicio (BaaS) para la gestión de datos.
+*   **TypeScript:** Un superconjunto de JavaScript que añade tipos estáticos.
 
-## Learn More
+## Cómo empezar
 
-To learn more about Next.js, take a look at the following resources:
+1.  **Clona el repositorio:**
+    ```bash
+    git clone https://github.com/tu-usuario/tu-repositorio.git
+    ```
+2.  **Instala las dependencias:**
+    ```bash
+    npm install
+    ```
+3.  **Configura las variables de entorno:**
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+    Crea un archivo `.env.local` en la raíz del proyecto y añade las siguientes variables:
+    ```
+    NEXT_PUBLIC_PARSE_APPLICATION_ID=TU_APP_ID
+    NEXT_PUBLIC_PARSE_JAVASCRIPT_KEY=TU_JS_KEY
+    ```
+4.  **Inicia el servidor de desarrollo:**
+    ```bash
+    npm run dev
+    ```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Abre [http://localhost:3000](http://localhost:3000) en tu navegador para ver la aplicación.
