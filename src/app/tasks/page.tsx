@@ -335,8 +335,8 @@ const TimeSummary: React.FC<TimeSummaryProps> = ({ totalMinutes }) => {
                 <span className="text-gray-500">=</span>
                 
                 <div className={`${baseStyle} ${diffStyle}`}>
-                    <p className="text-xs font-normal text-white/80">{resta >= 0 ? 'Falta' : 'Exceso'}</p>
-                    <p className="mt-1">{formatMinutes(resta)}</p>
+                    <p className="text-xs font-normal text-black/80">{resta >= 0 ? 'Falta' : 'Exceso'}</p>
+                    <p className="mt-1 text-black/80">{formatMinutes(resta)}</p>
                 </div>
             </div>
         </div>
