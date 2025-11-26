@@ -1,8 +1,8 @@
-// nisudev/new-task-manager/NisuDev-new-task-manager-3225873f3c07d5794b38fee3028b29fb4d12e05f/src/app/components/TaskCard.tsx
+// nisudev/new-task-manager/NisuDev-new-task-manager-f42f974d5d4e7f0771d714b82ec564ca21eef983/src/app/components/TaskCard.tsx
 // src/components/TaskCard.tsx
 import React, { useState } from 'react';
 import { Task, Interval } from '@/types';
-import { supabase } from '@/lib/supabase';
+import { Parse, ParseTask, ParseInterval, getUserId } from '@/lib/back4app'; // CAMBIO: Importar utilidades de Parse
 
 interface TaskCardProps {
     task: Task;
@@ -60,6 +60,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onUpdate, currentDate }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [title, setTitle] = useState(task.TITLE);
     const [description, setDescription] = useState(task.DESCRIPTION);
+    const userId = getUserId(); 
 
     // Estados para el nuevo intervalo
     const [hStart, setHStart] = useState('00');
@@ -67,7 +68,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onUpdate, currentDate }) => {
     const [hEnd, setHEnd] = useState('00');
     const [mEnd, setMEnd] = useState('00');
 
-    // --- Lógica de Validación y CRUD (Eliminación, Guardar, Intervalos) ---
+    // --- Lógica de Validación y CRUD ---
 
     const validateTime = (h: string, m: string): boolean => {
         const hour = parseInt(h);
@@ -86,101 +87,105 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onUpdate, currentDate }) => {
         return true;
     }
 
-    // Reemplaza joinedTask()
+    // CAMBIO: Update task status en Parse
     const handleJoinedToggle = async () => {
-        const { error } = await supabase
-            .from('task')
-            .update({ JOINED: !task.JOINED })
-            .eq('ID', task.ID);
+        try {
+            if (userId !== task.USER_ID) { throw new Error("Permiso denegado."); }
             
-        if (error) {
-            alert('Error al cambiar estado: ' + error.message);
-        } else {
+            // 1. Crear referencia al objeto Task
+            const parseTask = new ParseTask();
+            parseTask.set('objectId', task.ID); // Asignar el ID de Parse
+            
+            // 2. Establecer el nuevo valor
+            parseTask.set('JOINED', !task.JOINED); 
+            
+            await parseTask.save();
+            
             onUpdate(currentDate); 
+        } catch (error: any) {
+            console.error("Error al cambiar estado:", error);
+            alert('Error al cambiar estado: ' + error.message);
         }
     };
     
-    // Reemplaza saveModifyCard() (y src/saveModifyTask.php)
+    // CAMBIO: Save/Modify task en Parse
     const handleSaveModify = async () => {
-        const { error } = await supabase
-            .from('task')
-            .update({ TITLE: title, DESCRIPTION: description })
-            .eq('ID', task.ID);
+        try {
+            if (userId !== task.USER_ID) { throw new Error("Permiso denegado."); }
+
+            const parseTask = new ParseTask();
+            parseTask.set('objectId', task.ID);
             
-        if (error) {
-            alert('Error al guardar: ' + error.message);
-        } else {
+            parseTask.set('TITLE', title);
+            parseTask.set('DESCRIPTION', description);
+            
+            await parseTask.save();
+            
             setIsEditing(false);
             onUpdate(currentDate); 
+        } catch (error: any) {
+            console.error("Error al guardar:", error);
+            alert('Error al guardar: ' + error.message);
         }
     };
 
-    // FIX: Se garantiza la eliminación de intervalos primero y se mejora el manejo de errores/logs.
-    const handleDeleteTask = async (taskId: number) => {
+    // CAMBIO: Delete task y sus intervalos (Parse)
+    const handleDeleteTask = async (taskId: string) => {
         if (!window.confirm('¿Está seguro de eliminar esta tarea y todos sus intervalos? (Esta acción no se puede deshacer)')) {
             return;
         }
 
         try {
-            // 1. Eliminar intervalos asociados
-            console.log(`[DELETE] Intentando eliminar intervalos para TASK_ID: ${taskId}`);
-            const { error: intervalError, data: intervalData } = await supabase
-                .from('intervals')
-                .delete()
-                .eq('TASK_ID', taskId);
-            
-            if (intervalError) throw intervalError;
-            console.log("[DELETE] Intervalos eliminados con éxito. Data:", intervalData);
-            
-            // 2. Eliminar la tarea
-            console.log(`[DELETE] Intentando eliminar tarea con ID: ${taskId}`);
-            const { error: taskError, data: taskData } = await supabase
-                .from('task')
-                .delete()
-                .eq('ID', taskId); 
-                
-            if (taskError) throw taskError;
-            console.log("[DELETE] Tarea eliminada con éxito. Data:", taskData);
+            if (userId !== task.USER_ID) { throw new Error("Permiso denegado."); }
 
+            // 1. Eliminar intervalos asociados (dependientes del Pointer)
+            // Esto requiere una query para encontrar y eliminar.
+            const intervalsQuery = new Parse.Query(ParseInterval);
+            const taskPointer = ParseTask.createWithoutData(taskId); // Crear un puntero
+            intervalsQuery.equalTo("taskPointer", taskPointer);
+            
+            const intervalsToDelete = await intervalsQuery.find();
+            
+            await Parse.Object.destroyAll(intervalsToDelete);
+            console.log(`[DELETE] ${intervalsToDelete.length} intervalos eliminados con éxito.`);
+
+            // 2. Eliminar la tarea principal (Parse Object)
+            const parseTask = ParseTask.createWithoutData(taskId);
+            await parseTask.destroy(); 
+            console.log("[DELETE] Tarea eliminada con éxito.");
 
             alert('Tarea eliminada con éxito.');
             onUpdate(currentDate); 
             
         } catch (error: any) {
-            // MEJORA DE DEBUGGING: Muestra el error en la consola y un mensaje útil sobre RLS
             console.error('[CRITICAL ERROR] Fallo en handleDeleteTask:', error);
-            alert('ERROR al eliminar tarea: ' + (error?.message || 'Error desconocido. **VERIFIQUE SU CONSOLA** y sus políticas RLS.'));
+            alert('ERROR al eliminar tarea: ' + (error?.message || 'Error desconocido. **VERIFIQUE SUS REGLAS DE SEGURIDAD DE BACK4APP**'));
         }
     };
     
-    // FIX: Se añade alerta de éxito y mejora en el log de error.
-    const handleDeleteInterval = async (intervalId: number) => {
+    // CAMBIO: Delete interval (Parse)
+    const handleDeleteInterval = async (intervalId: string) => {
         if (!window.confirm('¿Está seguro de eliminar este intervalo?')) {
             return;
         }
 
         try {
-            console.log(`[DELETE] Intentando eliminar intervalo con ID: ${intervalId}`);
-            const { error, data } = await supabase
-                .from('intervals')
-                .delete()
-                .eq('ID', intervalId); 
-                
-            if (error) throw error;
-            console.log("[DELETE] Intervalo eliminado con éxito. Data:", data);
+            if (userId !== task.USER_ID) { throw new Error("Permiso denegado."); }
+            
+            const parseInterval = ParseInterval.createWithoutData(intervalId);
+            await parseInterval.destroy(); 
+            console.log("[DELETE] Intervalo eliminado con éxito.");
 
-            // FEEDBACK: Alerta de éxito añadida
             alert('Intervalo eliminado con éxito.');
             onUpdate(currentDate); 
             
         } catch (error: any) {
-            // MEJORA DE DEBUGGING: Muestra el error en la consola y un mensaje útil sobre RLS
             console.error('[CRITICAL ERROR] Fallo en handleDeleteInterval:', error);
-            alert('ERROR al eliminar intervalo: ' + (error?.message || 'Error desconocido. **VERIFIQUE SU CONSOLA** y sus políticas RLS.'));
+            alert('ERROR al eliminar intervalo: ' + (error?.message || 'Error desconocido. **VERIFIQUE SUS REGLAS DE SEGURIDAD DE BACK4APP**'));
         }
     };
 
-    // Reemplaza addInterval() (y src/newInterval.php)
+    // CAMBIO: Add interval (Parse)
     const handleAddInterval = async () => {
         if (!validateTime(hStart, mStart) || !validateTime(hEnd, mEnd)) return;
         
@@ -193,20 +198,24 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onUpdate, currentDate }) => {
         }
 
         try {
-            const { error } = await supabase
-                .from('intervals')
-                .insert({
-                    TASK_ID: task.ID,
-                    TIME_START: timeStart,
-                    TIME_END: timeEnd
-                });
-
-            if (error) throw error;
+            if (userId !== task.USER_ID) { throw new Error("Permiso denegado."); }
+            
+            // 1. Crear el puntero a la Tarea
+            const taskPointer = ParseTask.createWithoutData(task.ID);
+            
+            // 2. Crear el objeto Interval
+            const newInterval = new ParseInterval();
+            newInterval.set('taskPointer', taskPointer);
+            newInterval.set('TIME_START', timeStart);
+            newInterval.set('TIME_END', timeEnd);
+            
+            await newInterval.save();
 
             setHStart('00'); setMStart('00'); setHEnd('00'); setMEnd('00');
             onUpdate(currentDate); 
             
         } catch (error: any) {
+            console.error("Error al añadir intervalo:", error);
             alert('ERROR al añadir intervalo: ' + error.message);
         }
     };
@@ -251,7 +260,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onUpdate, currentDate }) => {
                                     <SaveIcon className="w-5 h-5" />
                                 </button>
                                 <button 
-                                    onClick={() => handleDeleteTask(task.ID)} 
+                                    onClick={() => handleDeleteTask(task.ID as string)} 
                                     className={`${actionButtonStyle} bg-red-50 text-red-600 hover:bg-red-100`} 
                                     title='Eliminar tarea'
                                 >
@@ -312,7 +321,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onUpdate, currentDate }) => {
                 <h5 className="font-semibold text-gray-700 border-b border-gray-200 pb-1 sticky top-0 bg-white z-10 text-sm">Intervalos ({task.intervals.length})</h5>
                 {task.intervals.length > 0 ? (
                     task.intervals
-                        .sort((a, b) => a.ID - b.ID)
+                        .sort((a, b) => (a.ID as string).localeCompare(b.ID as string)) 
                         .map(interval => (
                             <div key={interval.ID} className="flex justify-between items-center p-2 bg-gray-50 border border-gray-200 rounded-lg text-xs transition-colors hover:border-indigo-500">
                                 <span className="text-indigo-600 font-mono">
@@ -323,7 +332,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onUpdate, currentDate }) => {
                                         {interval.DIFF} Min
                                     </span>
                                     <button 
-                                        onClick={() => handleDeleteInterval(interval.ID)} 
+                                        onClick={() => handleDeleteInterval(interval.ID as string)} 
                                         className="text-red-600 hover:text-red-500 transition-colors"
                                         title="Eliminar Intervalo"
                                     >

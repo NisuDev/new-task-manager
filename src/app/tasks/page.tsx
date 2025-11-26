@@ -1,22 +1,21 @@
-// nisudev/new-task-manager/NisuDev-new-task-manager-3225873f3c07d5794b38fee3028b29fb4d12e05f/src/app/tasks/page.tsx
+// nisudev/new-task-manager/NisuDev-new-task-manager-f42f974d5d4e7f0771d714b82ec564ca21eef983/src/app/tasks/page.tsx
 'use client' 
 
 import React, { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
+import { Parse, ParseTask, ParseInterval, getUserId } from '@/lib/back4app'; // CAMBIO: Importar utilidades de Parse
+import { useRouter } from 'next/navigation'; 
 import { Task, Interval } from '@/types';
 import TaskCard from '../components/TaskCard'; 
-import { useRouter } from 'next/navigation'; 
 
+// --- Lógica de cálculo de minutos (No cambia) ---
 const calculateTotalMinutes = (intervals: Interval[]): number => {
     return intervals.reduce((sum, interval) => {
         if (interval.TIME_START && interval.TIME_END) {
-            // Asume que TIME_START y TIME_END están en formato "HH:MM:SS" (como se inserta en TaskCard.tsx)
             const [hStart, mStart] = interval.TIME_START.substring(0, 5).split(':').map(Number);
             const [hEnd, mEnd] = interval.TIME_END.substring(0, 5).split(':').map(Number);
             const totalMinsStart = hStart * 60 + mStart;
             const totalMinsEnd = hEnd * 60 + mEnd;
             const diff = totalMinsEnd - totalMinsStart;
-            // Asegura que no se sumen tiempos negativos si la lógica de la DB lo permite
             return sum + (diff > 0 ? diff : 0);
         }
         return sum;
@@ -24,17 +23,15 @@ const calculateTotalMinutes = (intervals: Interval[]): number => {
 };
 
 export default function TasksPage() {
-    // FIX: Initialize with a server-safe value (current date)
     const [date, setDate] = useState<string>(new Date().toISOString().substring(0, 10));
     const [tasks, setTasks] = useState<Task[]>([]);
     const [loading, setLoading] = useState(false);
-    const [totalDayMinutes, setTotalDayMinutes] = useState<number | null>(null); // Nuevo estado
+    const [totalDayMinutes, setTotalDayMinutes] = useState<number | null>(null); 
+    const [currentUserId, setCurrentUserId] = useState<string | null>(null); // Parse Object ID
     const router = useRouter();
 
     useEffect(() => {
         let initialDate = new Date().toISOString().substring(0, 10);
-
-        // Acceder a localStorage solo si estamos en el entorno del navegador
         if (typeof window !== 'undefined') {
             const storedDate = localStorage.getItem('date');
             if (storedDate) {
@@ -43,134 +40,130 @@ export default function TasksPage() {
             }
         }
 
-        const checkUserAndFetch = async (currentDate: string) => {
-            const { data: { session } } = await supabase.auth.getSession();
-            if (!session) {
-                router.replace('/'); 
-            } else {
-                fetchTasksAndSummary(currentDate);
-            }
-        };
-
-        checkUserAndFetch(initialDate);
+        // CAMBIO: Usar Parse.User.current() para verificar la sesión y obtener el ID
+        const user = Parse.User.current();
+        if (!user) {
+            router.replace('/'); 
+        } else {
+            const userId = user.id;
+            setCurrentUserId(userId);
+            fetchTasksAndSummary(initialDate, userId);
+        }
         
     }, [router]);
     
-    // Función central para obtener Tareas y Resumen (Reemplaza getDate() y getTime())
-    const fetchTasksAndSummary = async (selectedDate: string) => {
+    // Función central para obtener Tareas y Resumen
+    const fetchTasksAndSummary = async (selectedDate: string, userId: string | null = getUserId()) => {
+        if (!userId) {
+            router.replace('/');
+            return;
+        }
+
         setLoading(true);
         try {
-            // Update localStorage inside fetch, since it's now client-side logic
             if (typeof window !== 'undefined') {
                  localStorage.setItem('date', selectedDate);
             }
-
-            // If the date in state is different, update it (only needed if triggered externally, e.g. from the date picker)
             if (date !== selectedDate) {
                 setDate(selectedDate);
             }
             
-            // 1. Encontrar el DAY_ID
-            let { data: dayData, error: dayError } = await supabase
-                .from('day')
-                .select('ID')
-                .eq('DAY', selectedDate)
-                .single();
-
-            if (dayError || !dayData) {
-                setTasks([]);
-                setTotalDayMinutes(null);
-                setLoading(false);
-                return; 
-            }
-
-            const dayId = dayData.ID;
-
-            // 2. Obtener tareas e intervalos
-            const { data: taskData, error: taskError } = await supabase
-                .from('task')
-                .select(`
-                    ID, TITLE, DESCRIPTION, APPLICANT, TYPE, JOINED, 
-                    intervals (ID, TIME_START, TIME_END)
-                `)
-                .eq('DAY_ID', dayId)
-                .order('ID', { ascending: true });
-                
-
-            if (taskError) throw taskError;
+            // 1. Consulta principal: Obtener tareas por USER_ID y DAY
+            const tasksQuery = new Parse.Query(ParseTask);
+            tasksQuery.equalTo("USER_ID", userId);
+            tasksQuery.equalTo("DAY", selectedDate);
+            tasksQuery.ascending("createdAt"); // Ordenar por fecha de creación
             
+            const parseTasks = await tasksQuery.find();
+            
+            const processedTasks: Task[] = [];
             let totalMinutesForDay = 0;
+            
+            // 2. Procesar cada tarea y obtener Intervalos
+            for (const parseTask of parseTasks) {
+                const taskId = parseTask.id;
+                
+                // Obtener intervalos relacionados (Query de Pointer)
+                const intervalsQuery = new Parse.Query(ParseInterval);
+                intervalsQuery.equalTo("taskPointer", parseTask);
+                intervalsQuery.ascending("createdAt");
 
-            const processedTasks: Task[] = (taskData as any[]).map(task => {
-                const intervals: Interval[] = (task.intervals as any[]).map(int => ({ 
-                    ...int, 
-                    TASK_ID: task.ID, 
-                    DIFF: calculateTotalMinutes([int as Interval]), // Recalcula la diferencia para un solo intervalo
-                }));
+                const parseIntervals = await intervalsQuery.find();
+                
+                const intervals: Interval[] = parseIntervals.map(parseInterval => {
+                    const diff = calculateTotalMinutes([{ 
+                        TIME_START: parseInterval.get('TIME_START'), 
+                        TIME_END: parseInterval.get('TIME_END') 
+                    } as Interval]);
+                    
+                    return {
+                        ID: parseInterval.id as any, // Parse Object ID
+                        TASK_ID: taskId as any,
+                        TIME_START: parseInterval.get('TIME_START'), 
+                        TIME_END: parseInterval.get('TIME_END'),
+                        DIFF: diff,
+                    };
+                });
                 
                 const totalMinutes = calculateTotalMinutes(intervals);
                 totalMinutesForDay += totalMinutes;
 
-                return {
-                    ...task,
+                // Mapear el objeto Parse a la interfaz Task (DAY_ID removido)
+                processedTasks.push({
+                    ID: taskId as any,
+                    USER_ID: userId as any, 
+                    DAY: parseTask.get('DAY'),
+                    TITLE: parseTask.get('TITLE'),
+                    DESCRIPTION: parseTask.get('DESCRIPTION'),
+                    APPLICANT: parseTask.get('APPLICANT'),
+                    TYPE: parseTask.get('TYPE'),
+                    JOINED: parseTask.get('JOINED'),
                     intervals: intervals,
                     totalMinutes: totalMinutes,
-                };
-            });
+                });
+            }
 
             setTasks(processedTasks);
-            setTotalDayMinutes(totalMinutesForDay); // Setea el tiempo total
+            setTotalDayMinutes(totalMinutesForDay);
             
         } catch (error) {
             console.error("Error al cargar datos:", error);
+            // alert("Error al cargar tareas. Verifique sus claves y clases en Back4App.");
         } finally {
             setLoading(false);
         }
     };
     
-    // Función para crear nueva tarea (Ver paso 5.1 para la implementación completa)
+    // Función para crear nueva tarea
     const handleNewTask = async (type: 'TAREA' | 'SOPORTE') => {
-        if (!date) { alert('Debe seleccionar una fecha.'); return; }
+        if (!date || !currentUserId) { alert('Debe seleccionar una fecha e iniciar sesión.'); return; }
 
         try {
-            const user = await supabase.auth.getUser();
-            const userId = user.data.user?.id;
-            if (!userId) throw new Error("Usuario no autenticado.");
-
-            let { data: dayData } = await supabase.from('day').select('ID').eq('DAY', date).single();
-
-            let dayId: number;
-            if (!dayData) {
-                const { data: newDay, error } = await supabase.from('day').insert({ DAY: date }).select('ID').single();
-                if (error) throw error;
-                dayId = newDay.ID;
-            } else {
-                dayId = dayData.ID;
-            }
+            // 1. Crear nueva tarea Parse Object
+            const newTask = new ParseTask();
             
-            const { error: taskError } = await supabase
-                .from('task')
-                .insert({
-                    USER_ID: userId, // Asumiendo que has ajustado el esquema a UUID
-                    DAY_ID: dayId,
-                    TITLE: (type === 'TAREA' ? 'NUEVA TAREA' : 'NUEVO SOPORTE'),
-                    DESCRIPTION: 'Descripción Inicial',
-                    APPLICANT: 'TEST', 
-                    TYPE: type,
-                });
-
-            if (taskError) throw taskError;
+            // 2. Establecer propiedades y el puntero de usuario
+            newTask.set('USER_ID', currentUserId);
+            newTask.set('DAY', date); 
+            newTask.set('TITLE', (type === 'TAREA' ? 'NUEVA TAREA' : 'NUEVO SOPORTE'));
+            newTask.set('DESCRIPTION', 'Descripción Inicial');
+            newTask.set('APPLICANT', 'TEST'); 
+            newTask.set('TYPE', type);
+            newTask.set('JOINED', false);
+            newTask.set('owner', Parse.User.current()); // Puntero estándar de Parse al usuario
             
-            fetchTasksAndSummary(date); 
+            await newTask.save();
+            
+            fetchTasksAndSummary(date, currentUserId); 
             
         } catch (error: any) {
+            console.error(error);
             alert('ERROR al crear tarea: ' + error.message);
         }
     };
 
     const handleLogout = async () => {
-        await supabase.auth.signOut();
-        // Clear localStorage only on client
+        await Parse.User.logOut(); // CAMBIO: Usar logOut de Parse
         if (typeof window !== 'undefined') {
             localStorage.removeItem('date');
         }
@@ -199,11 +192,12 @@ export default function TasksPage() {
                     <input 
                         type="date" 
                         value={date}
-                        onChange={(e) => setDate(e.target.value)}
+                        // Al cambiar la fecha, llamamos a fetch para actualizar la vista
+                        onChange={(e) => fetchTasksAndSummary(e.target.value, currentUserId)} 
                         className="p-3 bg-gray-50 border border-gray-300 rounded-lg text-slate-900 text-base focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
                     />
                     <button 
-                        onClick={() => fetchTasksAndSummary(date)} 
+                        onClick={() => fetchTasksAndSummary(date, currentUserId)} 
                         className="px-6 py-3 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition-colors shadow-md"
                         disabled={loading}
                     >
@@ -235,7 +229,7 @@ export default function TasksPage() {
                             <TaskCard 
                                 key={task.ID} 
                                 task={task as Task} 
-                                onUpdate={fetchTasksAndSummary} 
+                                onUpdate={() => fetchTasksAndSummary(date, currentUserId)} // Llamar a fetch con la fecha y UID actualizados
                                 currentDate={date}
                             />
                         ))

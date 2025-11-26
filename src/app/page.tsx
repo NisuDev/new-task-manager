@@ -1,18 +1,18 @@
-// nisudev/new-task-manager/NisuDev-new-task-manager-3225873f3c07d5794b38fee3028b29fb4d12e05f/src/app/page.tsx
+// nisudev/new-task-manager/NisuDev-new-task-manager-f42f974d5d4e7f0771d714b82ec564ca21eef983/src/app/page.tsx
 // src/app/page.tsx
 'use client' 
 
 import React, { useState } from 'react';
-import { supabase } from '@/lib/supabase'; // Asegúrate de que la ruta a supabase sea correcta
+import { Parse } from '@/lib/back4app'; // CAMBIO: Importar Parse
 import { useRouter } from 'next/navigation';
 
 export default function LoginPage() {
-    const [email, setEmail] = useState(''); // Supabase usa email para signIn
+    const [email, setEmail] = useState(''); // Parse usa email para signIn
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
     const router = useRouter();
 
-    // Reemplaza la función login() de index.php
+    // Lógica para iniciar sesión
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault(); // Detiene la recarga de la página
         
@@ -23,39 +23,28 @@ export default function LoginPage() {
 
         setLoading(true);
         try {
-            // Usa signInWithPassword, reemplazando la lógica SQL de src/login.php
-            const { error } = await supabase.auth.signInWithPassword({ 
-                email: email, 
-                password: password 
-            });
+            // CAMBIO: Usar Parse.User.logIn(username, password)
+            // Parse requiere un 'username', por convención usaremos el email como username.
+            const user = await Parse.User.logIn(email, password); 
 
-            if (error) {
-                // *** DIAGNÓSTICO MEJORADO ***
-                // Muestra el mensaje de error exacto de Supabase.
-                // Los errores comunes son: "Email not confirmed" o "Invalid login credentials".
-                console.error("Login failed:", error);
-                alert(`Error al iniciar sesión: ${error.message}. Verifique su correo y contraseña, o si su cuenta requiere confirmación de email.`);
-            } else {
-                // Éxito: Reemplaza window.open('TaskManager.php','_self');
+            if (user) {
                 router.push('/tasks'); 
             }
-        } catch (e) {
-            console.error("Login failed", e);
-            alert('Ocurrió un error inesperado al intentar iniciar sesión.');
+        } catch (e: any) {
+            console.error("Login failed:", e);
+            alert(`Error al iniciar sesión: ${e.message}. Verifique su correo y contraseña.`);
         } finally {
             setLoading(false);
         }
     };
     
-    // Opcional: Redirigir si el usuario ya está autenticado (similar a la sesión en PHP)
+    // Opcional: Redirigir si el usuario ya está autenticado
     React.useEffect(() => {
-        const checkSession = async () => {
-            const { data: { session } } = await supabase.auth.getSession();
-            if (session) {
-                router.replace('/tasks');
-            }
-        };
-        checkSession();
+        // CAMBIO: Usar Parse.User.current() para verificar la sesión
+        const user = Parse.User.current();
+        if (user) {
+            router.replace('/tasks');
+        }
     }, [router]);
 
 
