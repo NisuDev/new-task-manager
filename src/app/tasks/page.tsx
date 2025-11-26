@@ -6,7 +6,7 @@ import { Parse, ParseTask, ParseInterval, getUserId } from '@/lib/back4app';
 import { useRouter } from 'next/navigation'; 
 import { Task, Interval } from '@/types';
 // CORRECCIÓN: Usar alias de ruta @/ para importaciones robustas
-import TaskCard from '@/app/components/TaskCard'; 
+import TaskCard from '@/app/components/TaskCard';
 
 // --- Lógica de cálculo de minutos (No cambia) ---
 const calculateTotalMinutes = (intervals: Interval[]): number => {
