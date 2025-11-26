@@ -2,10 +2,11 @@
 'use client' 
 
 import React, { useState, useEffect, useRef } from 'react'; // CAMBIO: ADDED useRef
-import { Parse, ParseTask, ParseInterval, getUserId } from '@/lib/back4app'; // CAMBIO: Importar utilidades de Parse
+import { Parse, ParseTask, ParseInterval, getUserId } from '@/lib/back4app';
 import { useRouter } from 'next/navigation'; 
 import { Task, Interval } from '@/types';
-import TaskCard from '../components/TaskCard'; 
+// CORRECCIÓN: Usar alias de ruta @/ para importaciones robustas
+import TaskCard from '@/app/components/TaskCard'; 
 
 // --- Lógica de cálculo de minutos (No cambia) ---
 const calculateTotalMinutes = (intervals: Interval[]): number => {
@@ -107,10 +108,11 @@ export default function TasksPage() {
 
                 const parseIntervals = await intervalsQuery.find();
                 
-                const intervals: Interval[] = parseIntervals.map(parseInterval => {
-                    const diff = calculateTotalMinutes([{ 
-                        TIME_START: parseInterval.get('TIME_START'), 
-                        TIME_END: parseInterval.get('TIME_END') 
+                // CORRECCIÓN DE TIPADO: Especificar el tipo de parseInterval como Parse.Object
+                const intervals: Interval[] = parseIntervals.map((parseInterval: typeof ParseInterval) => {
+                    const diff = calculateTotalMinutes([{ 
+                        TIME_START: parseInterval.get('TIME_START'), 
+                        TIME_END: parseInterval.get('TIME_END') 
                     } as Interval]);
                     
                     return {
