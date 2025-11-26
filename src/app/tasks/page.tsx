@@ -7,7 +7,6 @@ import { useRouter } from 'next/navigation';
 import { Task, Interval } from '@/types';
 import TaskCard from '../components/TaskCard'; 
 
-// --- Lógica de cálculo de minutos (No cambia) ---
 const calculateTotalMinutes = (intervals: Interval[]): number => {
     return intervals.reduce((sum, interval) => {
         if (interval.TIME_START && interval.TIME_END) {

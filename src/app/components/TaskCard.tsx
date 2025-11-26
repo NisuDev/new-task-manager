@@ -1,8 +1,9 @@
-// nisudev/new-task-manager/NisuDev-new-task-manager-f42f974d5d4e7f0771d714b82ec564ca21eef983/src/app/components/TaskCard.tsx
+// nisudev/new-task-manager/NisuDev-new-task-manager-6495ee1c944b18f7f16e75776c2eb73208fc0c3a/src/app/components/TaskCard.tsx
 // src/components/TaskCard.tsx
 import React, { useState } from 'react';
 import { Task, Interval } from '@/types';
 import { Parse, ParseTask, ParseInterval, getUserId } from '@/lib/back4app'; // CAMBIO: Importar utilidades de Parse
+import DeleteConfirmationModal from './DeleteConfirmationModal'; // Importar el nuevo modal
 
 interface TaskCardProps {
     task: Task;
@@ -55,8 +56,8 @@ const TimeInput: React.FC<TimeInputProps> = ({ label, hValue, mValue, onHChange,
     );
 }
 
-
-const TaskCard: React.FC<TaskCardProps> = ({ task, onUpdate, currentDate }) => {
+// CORRECCIÓN: Se utiliza la sintaxis de componente funcional estándar (no React.FC) para resolver el error de tipado en React 19 / Next.js.
+const TaskCard = ({ task, onUpdate, currentDate }: TaskCardProps) => {
     const [isEditing, setIsEditing] = useState(false);
     const [title, setTitle] = useState(task.TITLE);
     const [description, setDescription] = useState(task.DESCRIPTION);
@@ -67,6 +68,12 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onUpdate, currentDate }) => {
     const [mStart, setMStart] = useState('00');
     const [hEnd, setHEnd] = useState('00');
     const [mEnd, setMEnd] = useState('00');
+
+    // **NUEVOS ESTADOS PARA CONTROL DEL MODAL**
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [deleteTarget, setDeleteTarget] = useState<{ type: 'task' | 'interval'; id: string; } | null>(null);
+    const [deleteMessage, setDeleteMessage] = useState('');
+
 
     // --- Lógica de Validación y CRUD ---
 
@@ -129,63 +136,86 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onUpdate, currentDate }) => {
         }
     };
 
-    // CAMBIO: Delete task y sus intervalos (Parse)
-    const handleDeleteTask = async (taskId: string) => {
-        if (!window.confirm('¿Está seguro de eliminar esta tarea y todos sus intervalos? (Esta acción no se puede deshacer)')) {
-            return;
-        }
-
+    // **REFRACTORIZACIÓN: FUNCIÓN DE EJECUCIÓN DE ELIMINACIÓN DE TAREA**
+    const executeDeleteTask = async (taskId: string) => {
         try {
             if (userId !== task.USER_ID) { throw new Error("Permiso denegado."); }
 
-            // 1. Eliminar intervalos asociados (dependientes del Pointer)
-            // Esto requiere una query para encontrar y eliminar.
+            // 1. Eliminar intervalos asociados
             const intervalsQuery = new Parse.Query(ParseInterval);
-            const taskPointer = ParseTask.createWithoutData(taskId); // Crear un puntero
+            const taskPointer = ParseTask.createWithoutData(taskId);
             intervalsQuery.equalTo("taskPointer", taskPointer);
             
             const intervalsToDelete = await intervalsQuery.find();
-            
             await Parse.Object.destroyAll(intervalsToDelete);
             console.log(`[DELETE] ${intervalsToDelete.length} intervalos eliminados con éxito.`);
 
-            // 2. Eliminar la tarea principal (Parse Object)
-            const parseTask = ParseTask.createWithoutData(taskId);
-            await parseTask.destroy(); 
+            // 2. Eliminar la tarea principal (Robusto: usamos query.get)
+            const taskQuery = new Parse.Query(ParseTask);
+            const taskToDelete = await taskQuery.get(taskId);
+            await taskToDelete.destroy();
             console.log("[DELETE] Tarea eliminada con éxito.");
 
             alert('Tarea eliminada con éxito.');
             onUpdate(currentDate); 
             
         } catch (error: any) {
-            console.error('[CRITICAL ERROR] Fallo en handleDeleteTask:', error);
-            alert('ERROR al eliminar tarea: ' + (error?.message || 'Error desconocido. **VERIFIQUE SUS REGLAS DE SEGURIDAD DE BACK4APP**'));
+            console.error('[CRITICAL ERROR] Fallo en executeDeleteTask:', error);
+            alert('ERROR al eliminar tarea: ' + (error?.message || 'Error desconocido.') + '. Revise sus ACLs en Back4App.');
         }
     };
     
-    // CAMBIO: Delete interval (Parse)
-    const handleDeleteInterval = async (intervalId: string) => {
-        if (!window.confirm('¿Está seguro de eliminar este intervalo?')) {
-            return;
-        }
-
+    // **REFRACTORIZACIÓN: FUNCIÓN DE EJECUCIÓN DE ELIMINACIÓN DE INTERVALO**
+    const executeDeleteInterval = async (intervalId: string) => {
         try {
             if (userId !== task.USER_ID) { throw new Error("Permiso denegado."); }
             
-            const parseInterval = ParseInterval.createWithoutData(intervalId);
-            await parseInterval.destroy(); 
+            // Robusto: usamos query.get
+            const intervalQuery = new Parse.Query(ParseInterval);
+            const intervalToDelete = await intervalQuery.get(intervalId);
+            await intervalToDelete.destroy();
             console.log("[DELETE] Intervalo eliminado con éxito.");
 
             alert('Intervalo eliminado con éxito.');
             onUpdate(currentDate); 
             
         } catch (error: any) {
-            console.error('[CRITICAL ERROR] Fallo en handleDeleteInterval:', error);
-            alert('ERROR al eliminar intervalo: ' + (error?.message || 'Error desconocido. **VERIFIQUE SUS REGLAS DE SEGURIDAD DE BACK4APP**'));
+            console.error('[CRITICAL ERROR] Fallo en executeDeleteInterval:', error);
+            alert('ERROR al eliminar intervalo: ' + (error?.message || 'Error desconocido.') + '. Revise sus ACLs en Back4App.');
         }
     };
 
-    // CAMBIO: Add interval (Parse)
+    // **NUEVO HANDLER: Ejecuta la eliminación después de la confirmación del modal**
+    const handleConfirmDelete = async () => {
+        if (!deleteTarget) return;
+
+        setIsModalOpen(false);
+        
+        if (deleteTarget.type === 'task') {
+            await executeDeleteTask(deleteTarget.id);
+        } else if (deleteTarget.type === 'interval') {
+            await executeDeleteInterval(deleteTarget.id);
+        }
+        
+        setDeleteTarget(null);
+        setDeleteMessage('');
+    };
+
+    // **HANDLER DEL BOTÓN: Muestra el modal**
+    const handleDeleteTaskClick = (taskId: string) => {
+        setDeleteTarget({ type: 'task', id: taskId });
+        setDeleteMessage('¿Está seguro de eliminar esta tarea y todos sus intervalos? (Esta acción no se puede deshacer)');
+        setIsModalOpen(true);
+    };
+
+    // **HANDLER DEL BOTÓN: Muestra el modal**
+    const handleDeleteIntervalClick = (intervalId: string) => {
+        setDeleteTarget({ type: 'interval', id: intervalId });
+        setDeleteMessage('¿Está seguro de eliminar este intervalo?');
+        setIsModalOpen(true);
+    };
+
+    // CORRECCIÓN FUNCIONAL: Add interval (Parse) - Incluye ACL y owner
     const handleAddInterval = async () => {
         if (!validateTime(hStart, mStart) || !validateTime(hEnd, mEnd)) return;
         
@@ -200,11 +230,25 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onUpdate, currentDate }) => {
         try {
             if (userId !== task.USER_ID) { throw new Error("Permiso denegado."); }
             
+            // OBTENER USUARIO ACTUAL para ACL y puntero 'owner'
+            const currentUser = Parse.User.current(); 
+            if (!currentUser) { 
+                alert('Error de autenticación. Por favor, vuelva a iniciar sesión.');
+                return;
+            }
+
             // 1. Crear el puntero a la Tarea
             const taskPointer = ParseTask.createWithoutData(task.ID);
             
             // 2. Crear el objeto Interval
             const newInterval = new ParseInterval();
+            
+            // Establecer ACL y el puntero 'owner'
+            const acl = new Parse.ACL(currentUser);
+            newInterval.setACL(acl);
+            newInterval.set('owner', currentUser); 
+
+            // Establecer el puntero a la Tarea padre
             newInterval.set('taskPointer', taskPointer);
             newInterval.set('TIME_START', timeStart);
             newInterval.set('TIME_END', timeEnd);
@@ -260,7 +304,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onUpdate, currentDate }) => {
                                     <SaveIcon className="w-5 h-5" />
                                 </button>
                                 <button 
-                                    onClick={() => handleDeleteTask(task.ID as string)} 
+                                    onClick={() => handleDeleteTaskClick(task.ID as string)} 
                                     className={`${actionButtonStyle} bg-red-50 text-red-600 hover:bg-red-100`} 
                                     title='Eliminar tarea'
                                 >
@@ -332,7 +376,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onUpdate, currentDate }) => {
                                         {interval.DIFF} Min
                                     </span>
                                     <button 
-                                        onClick={() => handleDeleteInterval(interval.ID as string)} 
+                                        onClick={() => handleDeleteIntervalClick(interval.ID as string)} 
                                         className="text-red-600 hover:text-red-500 transition-colors"
                                         title="Eliminar Intervalo"
                                     >
@@ -361,6 +405,18 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onUpdate, currentDate }) => {
                     </button>
                 </div>
             </div>
+            
+            {/* Modal de Confirmación (Renderizado) */}
+            <DeleteConfirmationModal
+                isOpen={isModalOpen}
+                message={deleteMessage}
+                onConfirm={handleConfirmDelete}
+                onClose={() => {
+                    setIsModalOpen(false);
+                    setDeleteTarget(null);
+                    setDeleteMessage('');
+                }}
+            />
         </div>
     );
 }
