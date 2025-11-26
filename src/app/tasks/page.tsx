@@ -1,12 +1,13 @@
 // nisudev/new-task-manager/NisuDev-new-task-manager-f42f974d5d4e7f0771d714b82ec564ca21eef983/src/app/tasks/page.tsx
 'use client' 
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react'; // CAMBIO: ADDED useRef
 import { Parse, ParseTask, ParseInterval, getUserId } from '@/lib/back4app'; // CAMBIO: Importar utilidades de Parse
 import { useRouter } from 'next/navigation'; 
 import { Task, Interval } from '@/types';
 import TaskCard from '../components/TaskCard'; 
 
+// --- Lógica de cálculo de minutos (No cambia) ---
 const calculateTotalMinutes = (intervals: Interval[]): number => {
     return intervals.reduce((sum, interval) => {
         if (interval.TIME_START && interval.TIME_END) {
@@ -28,6 +29,9 @@ export default function TasksPage() {
     const [totalDayMinutes, setTotalDayMinutes] = useState<number | null>(null); 
     const [currentUserId, setCurrentUserId] = useState<string | null>(null); // Parse Object ID
     const router = useRouter();
+    
+    // CAMBIO: Ref para guardar la posición del scroll
+    const scrollRef = useRef(0);
 
     useEffect(() => {
         let initialDate = new Date().toISOString().substring(0, 10);
@@ -39,7 +43,6 @@ export default function TasksPage() {
             }
         }
 
-        // CAMBIO: Usar Parse.User.current() para verificar la sesión y obtener el ID
         const user = Parse.User.current();
         if (!user) {
             router.replace('/'); 
@@ -51,11 +54,26 @@ export default function TasksPage() {
         
     }, [router]);
     
+    // CAMBIO: useEffect para restaurar el scroll
+    useEffect(() => {
+        // Restaurar scroll solo si hay tareas y se había guardado una posición.
+        if (tasks.length > 0 && scrollRef.current > 0) {
+            window.scrollTo(0, scrollRef.current);
+            scrollRef.current = 0; // Resetear el valor de la referencia
+        }
+    }, [tasks]);
+
+    
     // Función central para obtener Tareas y Resumen
     const fetchTasksAndSummary = async (selectedDate: string, userId: string | null = getUserId()) => {
         if (!userId) {
             router.replace('/');
             return;
+        }
+
+        // CAMBIO: Guardar la posición del scroll ANTES de cargar para evitar el reseteo
+        if (tasks.length > 0) {
+            scrollRef.current = window.scrollY;
         }
 
         setLoading(true);
@@ -138,6 +156,9 @@ export default function TasksPage() {
         if (!date || !currentUserId) { alert('Debe seleccionar una fecha e iniciar sesión.'); return; }
 
         try {
+            // CAMBIO SCROLL: Guardar scroll antes de la acción que recarga
+            scrollRef.current = window.scrollY;
+
             // 1. Crear nueva tarea Parse Object
             const newTask = new ParseTask();
             
@@ -151,6 +172,10 @@ export default function TasksPage() {
             newTask.set('JOINED', false);
             newTask.set('owner', Parse.User.current()); // Puntero estándar de Parse al usuario
             
+            // Asignar ACL (Recomendado para nuevas tareas)
+            const acl = new Parse.ACL(Parse.User.current());
+            newTask.setACL(acl);
+
             await newTask.save();
             
             fetchTasksAndSummary(date, currentUserId); 
@@ -207,28 +232,43 @@ export default function TasksPage() {
                 {/* Resumen de Tiempo */}
                 <TimeSummary totalMinutes={totalDayMinutes} />
                 
+                {/* CAMBIO: Botones de añadir tarea siempre visibles */}
+                <div className="flex justify-center space-x-4 mb-8">
+                    <button 
+                        onClick={() => handleNewTask('TAREA')} 
+                        className="px-5 py-2 text-white bg-green-600 rounded-lg font-medium hover:bg-green-700 transition-colors shadow-md disabled:opacity-50"
+                        disabled={loading}
+                    >
+                        + Nueva Tarea
+                    </button>
+                    <button 
+                        onClick={() => handleNewTask('SOPORTE')} 
+                        className="px-5 py-2 text-white bg-pink-600 rounded-lg font-medium hover:bg-pink-700 transition-colors shadow-md disabled:opacity-50"
+                        disabled={loading}
+                    >
+                        + Nuevo Soporte
+                    </button>
+                </div>
+
                 {/* Lista de Tareas */}
                 <div id="card-display" className="space-y-4">
                     {loading ? (
                         <div className="text-center text-indigo-600 p-8 bg-white rounded-xl shadow-md">Cargando tareas...</div>
                     ) : tasks.length === 0 ? (
+                        // CAMBIO: Se elimina la lógica de los botones para dejar solo el mensaje.
                         <div className="p-8 bg-white border-2 border-dashed border-gray-300 rounded-xl text-center shadow-md">
-                            <p className="text-gray-600 mb-5 text-lg">No hay tareas para esta fecha.</p>
-                            <div className="flex justify-center space-x-4">
-                                <button onClick={() => handleNewTask('TAREA')} className="px-5 py-2 text-white bg-green-600 rounded-lg font-medium hover:bg-green-700 transition-colors shadow-md">
-                                    + Nueva Tarea
-                                </button>
-                                <button onClick={() => handleNewTask('SOPORTE')} className="px-5 py-2 text-white bg-pink-600 rounded-lg font-medium hover:bg-pink-700 transition-colors shadow-md">
-                                    + Nuevo Soporte
-                                </button>
-                            </div>
+                            <p className="text-gray-600 mb-0 text-lg">No hay tareas para esta fecha.</p>
                         </div>
                     ) : (
                         tasks.map(task => (
                             <TaskCard 
                                 key={task.ID} 
                                 task={task as Task} 
-                                onUpdate={() => fetchTasksAndSummary(date, currentUserId)} // Llamar a fetch con la fecha y UID actualizados
+                                // CAMBIO SCROLL: onUpdate ahora también guarda el scroll
+                                onUpdate={() => { 
+                                    scrollRef.current = window.scrollY;
+                                    fetchTasksAndSummary(date, currentUserId); 
+                                }} 
                                 currentDate={date}
                             />
                         ))
