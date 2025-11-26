@@ -1,14 +1,13 @@
-// nisudev/new-task-manager/NisuDev-new-task-manager-f42f974d5d4e7f0771d714b82ec564ca21eef983/src/app/tasks/page.tsx
+// src/app/tasks/page.tsx
 'use client' 
 
-import React, { useState, useEffect, useRef } from 'react'; // CAMBIO: ADDED useRef
+import React, { useState, useEffect, useRef } from 'react'; 
 import { Parse, ParseTask, ParseInterval, getUserId } from '@/lib/back4app';
 import { useRouter } from 'next/navigation'; 
 import { Task, Interval } from '@/types';
-// CORRECCIÓN: Usar alias de ruta @/ para importaciones robustas
 import TaskCard from '@/app/components/TaskCard';
 
-// --- Lógica de cálculo de minutos (No cambia) ---
+// --- Lógica de cálculo de minutos ---
 const calculateTotalMinutes = (intervals: Interval[]): number => {
     return intervals.reduce((sum, interval) => {
         if (interval.TIME_START && interval.TIME_END) {
@@ -28,10 +27,12 @@ export default function TasksPage() {
     const [tasks, setTasks] = useState<Task[]>([]);
     const [loading, setLoading] = useState(false);
     const [totalDayMinutes, setTotalDayMinutes] = useState<number | null>(null); 
-    const [currentUserId, setCurrentUserId] = useState<string | null>(null); // Parse Object ID
-    const router = useRouter();
+    const [currentUserId, setCurrentUserId] = useState<string | null>(null); 
     
-    // CAMBIO: Ref para guardar la posición del scroll
+    // NUEVO ESTADO: Para rastrear el ID del último intervalo creado en todo el día
+    const [lastCreatedIntervalId, setLastCreatedIntervalId] = useState<string | null>(null);
+
+    const router = useRouter();
     const scrollRef = useRef(0);
 
     useEffect(() => {
@@ -55,24 +56,20 @@ export default function TasksPage() {
         
     }, [router]);
     
-    // CAMBIO: useEffect para restaurar el scroll
     useEffect(() => {
-        // Restaurar scroll solo si hay tareas y se había guardado una posición.
         if (tasks.length > 0 && scrollRef.current > 0) {
             window.scrollTo(0, scrollRef.current);
-            scrollRef.current = 0; // Resetear el valor de la referencia
+            scrollRef.current = 0; 
         }
     }, [tasks]);
 
     
-    // Función central para obtener Tareas y Resumen
     const fetchTasksAndSummary = async (selectedDate: string, userId: string | null = getUserId()) => {
         if (!userId) {
             router.replace('/');
             return;
         }
 
-        // CAMBIO: Guardar la posición del scroll ANTES de cargar para evitar el reseteo
         if (tasks.length > 0) {
             scrollRef.current = window.scrollY;
         }
@@ -86,37 +83,44 @@ export default function TasksPage() {
                 setDate(selectedDate);
             }
             
-            // 1. Consulta principal: Obtener tareas por USER_ID y DAY
             const tasksQuery = new Parse.Query(ParseTask);
             tasksQuery.equalTo("USER_ID", userId);
             tasksQuery.equalTo("DAY", selectedDate);
-            tasksQuery.ascending("createdAt"); // Ordenar por fecha de creación
+            tasksQuery.ascending("createdAt"); 
             
             const parseTasks = await tasksQuery.find();
             
             const processedTasks: Task[] = [];
             let totalMinutesForDay = 0;
+
+            // Variables para encontrar el intervalo más reciente globalmente
+            let globalMaxCreatedAt = 0;
+            let globalLatestId: string | null = null;
             
-            // 2. Procesar cada tarea y obtener Intervalos
             for (const parseTask of parseTasks) {
                 const taskId = parseTask.id;
                 
-                // Obtener intervalos relacionados (Query de Pointer)
                 const intervalsQuery = new Parse.Query(ParseInterval);
                 intervalsQuery.equalTo("taskPointer", parseTask);
                 intervalsQuery.ascending("createdAt");
 
                 const parseIntervals = await intervalsQuery.find();
                 
-                // CORRECCIÓN DE TIPADO: Especificar el tipo de parseInterval como Parse.Object
                 const intervals: Interval[] = parseIntervals.map((parseInterval: typeof ParseInterval) => {
+                    // Comprobar fecha de creación para identificar el último global
+                    const createdAtTime = parseInterval.createdAt.getTime();
+                    if (createdAtTime > globalMaxCreatedAt) {
+                        globalMaxCreatedAt = createdAtTime;
+                        globalLatestId = parseInterval.id;
+                    }
+
                     const diff = calculateTotalMinutes([{ 
                         TIME_START: parseInterval.get('TIME_START'), 
                         TIME_END: parseInterval.get('TIME_END') 
                     } as Interval]);
                     
                     return {
-                        ID: parseInterval.id as any, // Parse Object ID
+                        ID: parseInterval.id as any, 
                         TASK_ID: taskId as any,
                         TIME_START: parseInterval.get('TIME_START'), 
                         TIME_END: parseInterval.get('TIME_END'),
@@ -127,7 +131,6 @@ export default function TasksPage() {
                 const totalMinutes = calculateTotalMinutes(intervals);
                 totalMinutesForDay += totalMinutes;
 
-                // Mapear el objeto Parse a la interfaz Task (DAY_ID removido)
                 processedTasks.push({
                     ID: taskId as any,
                     USER_ID: userId as any, 
@@ -144,27 +147,23 @@ export default function TasksPage() {
 
             setTasks(processedTasks);
             setTotalDayMinutes(totalMinutesForDay);
+            setLastCreatedIntervalId(globalLatestId); // Guardamos el ID ganador
             
         } catch (error) {
             console.error("Error al cargar datos:", error);
-            // alert("Error al cargar tareas. Verifique sus claves y clases en Back4App.");
         } finally {
             setLoading(false);
         }
     };
     
-    // Función para crear nueva tarea
     const handleNewTask = async (type: 'TAREA' | 'SOPORTE') => {
         if (!date || !currentUserId) { alert('Debe seleccionar una fecha e iniciar sesión.'); return; }
 
         try {
-            // CAMBIO SCROLL: Guardar scroll antes de la acción que recarga
             scrollRef.current = window.scrollY;
 
-            // 1. Crear nueva tarea Parse Object
             const newTask = new ParseTask();
             
-            // 2. Establecer propiedades y el puntero de usuario
             newTask.set('USER_ID', currentUserId);
             newTask.set('DAY', date); 
             newTask.set('TITLE', (type === 'TAREA' ? 'NUEVA TAREA' : 'NUEVO SOPORTE'));
@@ -172,9 +171,8 @@ export default function TasksPage() {
             newTask.set('APPLICANT', 'TEST'); 
             newTask.set('TYPE', type);
             newTask.set('JOINED', false);
-            newTask.set('owner', Parse.User.current()); // Puntero estándar de Parse al usuario
+            newTask.set('owner', Parse.User.current()); 
             
-            // Asignar ACL (Recomendado para nuevas tareas)
             const acl = new Parse.ACL(Parse.User.current());
             newTask.setACL(acl);
 
@@ -189,7 +187,7 @@ export default function TasksPage() {
     };
 
     const handleLogout = async () => {
-        await Parse.User.logOut(); // CAMBIO: Usar logOut de Parse
+        await Parse.User.logOut(); 
         if (typeof window !== 'undefined') {
             localStorage.removeItem('date');
         }
@@ -198,11 +196,9 @@ export default function TasksPage() {
     
 
     return (
-        // Fondo claro
         <div className="min-h-screen bg-gray-50 p-8 text-slate-900">
             <div className="container mx-auto max-w-5xl">
                 
-                {/* Header */}
                 <div className="flex justify-between items-center pb-6 border-b border-gray-200">
                     <h1 className="text-3xl font-extrabold text-slate-900">Task Manager</h1>
                     <button 
@@ -213,12 +209,10 @@ export default function TasksPage() {
                     </button>
                 </div>
 
-                {/* Date and Action Controls (Cleaned up) */}
                 <div className="flex flex-col md:flex-row justify-center space-y-4 md:space-y-0 md:space-x-4 my-8 p-4 bg-white rounded-xl shadow-md border border-gray-200">
                     <input 
                         type="date" 
                         value={date}
-                        // Al cambiar la fecha, llamamos a fetch para actualizar la vista
                         onChange={(e) => fetchTasksAndSummary(e.target.value, currentUserId)} 
                         className="p-3 bg-gray-50 border border-gray-300 rounded-lg text-slate-900 text-base focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
                     />
@@ -231,10 +225,8 @@ export default function TasksPage() {
                     </button>
                 </div>
 
-                {/* Resumen de Tiempo */}
                 <TimeSummary totalMinutes={totalDayMinutes} />
                 
-                {/* CAMBIO: Botones de añadir tarea siempre visibles */}
                 <div className="flex justify-center space-x-4 mb-8">
                     <button 
                         onClick={() => handleNewTask('TAREA')} 
@@ -252,12 +244,10 @@ export default function TasksPage() {
                     </button>
                 </div>
 
-                {/* Lista de Tareas */}
                 <div id="card-display" className="space-y-4">
                     {loading ? (
                         <div className="text-center text-indigo-600 p-8 bg-white rounded-xl shadow-md">Cargando tareas...</div>
                     ) : tasks.length === 0 ? (
-                        // CAMBIO: Se elimina la lógica de los botones para dejar solo el mensaje.
                         <div className="p-8 bg-white border-2 border-dashed border-gray-300 rounded-xl text-center shadow-md">
                             <p className="text-gray-600 mb-0 text-lg">No hay tareas para esta fecha.</p>
                         </div>
@@ -266,12 +256,12 @@ export default function TasksPage() {
                             <TaskCard 
                                 key={task.ID} 
                                 task={task as Task} 
-                                // CAMBIO SCROLL: onUpdate ahora también guarda el scroll
                                 onUpdate={() => { 
                                     scrollRef.current = window.scrollY;
                                     fetchTasksAndSummary(date, currentUserId); 
                                 }} 
                                 currentDate={date}
+                                latestGlobalIntervalId={lastCreatedIntervalId} // PASAR PROP NUEVA
                             />
                         ))
                     )}
@@ -282,14 +272,14 @@ export default function TasksPage() {
 }
 
 // ----------------------------------------------------
-// Componente de Resumen de Tiempo (Minimalista Claro)
+// Componente de Resumen de Tiempo
 // ----------------------------------------------------
 
 interface TimeSummaryProps {
     totalMinutes: number | null;
 }
 
-const DAILY_TARGET_MINUTES = 570; // 9 horas y media (constante del PHP)
+const DAILY_TARGET_MINUTES = 570; 
 
 const formatMinutes = (minutes: number): string => {
     const sign = minutes >= 0 ? '' : '';
@@ -308,10 +298,8 @@ const TimeSummary: React.FC<TimeSummaryProps> = ({ totalMinutes }) => {
     
     const resta = DAILY_TARGET_MINUTES - totalMinutes;
     
-    // Contenedor blanco con borde gris
     const baseStyle = "px-4 py-2 text-center text-lg font-semibold rounded-lg border border-gray-200 bg-white shadow-sm transition-colors";
     
-    // Estilos de diferencia: azul para positivo, rojo para negativo
     const diffStyle = resta >= 0 
         ? 'bg-indigo-600 text-white' 
         : 'bg-red-600 text-white';

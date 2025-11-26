@@ -1,16 +1,18 @@
 // src/app/components/TaskCard.tsx
 import React, { useState } from 'react';
 import { Task, Interval } from '@/types';
-import { Parse, ParseTask, ParseInterval, getUserId } from '@/lib/back4app'; // Importar utilidades de Parse
-import DeleteConfirmationModal from './DeleteConfirmationModal'; // Importar el modal
+import { Parse, ParseTask, ParseInterval, getUserId } from '@/lib/back4app'; 
+import DeleteConfirmationModal from './DeleteConfirmationModal'; 
 
 interface TaskCardProps {
     task: Task;
     onUpdate: (date: string) => void;
     currentDate: string;
+    // NUEVA PROP: Recibe el ID global
+    latestGlobalIntervalId: string | null;
 }
 
-// SVG Icons for clean design
+// SVG Icons
 const EditIcon = (props: React.SVGProps<SVGSVGElement>) => <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>;
 const SaveIcon = (props: React.SVGProps<SVGSVGElement>) => <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4v4m0 0l-1-1m1 1l1-1m-1 1l-1 1m1-1l1 1m-1 1v-4m0 0l-1-1m1 1l1-1m-1 1l-1 1m1-1l1 1m-1 1v-4m0 0l-1-1m1 1l1-1m-1 1l-1 1m1-1l1 1" /></svg>;
 const DeleteIcon = (props: React.SVGProps<SVGSVGElement>) => <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>;
@@ -18,7 +20,7 @@ const XIcon = (props: React.SVGProps<SVGSVGElement>) => <svg {...props} xmlns="h
 const actionButtonStyle = "p-2 rounded-lg transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-50";
 
 
-// Sub-component for clean time input rendering
+// Sub-component for clean time input
 interface TimeInputProps {
     label: string;
     hValue: string;
@@ -54,19 +56,17 @@ const TimeInput: React.FC<TimeInputProps> = ({ label, hValue, mValue, onHChange,
     );
 }
 
-const TaskCard = ({ task, onUpdate, currentDate }: TaskCardProps) => {
+const TaskCard = ({ task, onUpdate, currentDate, latestGlobalIntervalId }: TaskCardProps) => {
     const [isEditing, setIsEditing] = useState(false);
     const [title, setTitle] = useState(task.TITLE);
     const [description, setDescription] = useState(task.DESCRIPTION);
     const userId = getUserId(); 
 
-    // Estados para el nuevo intervalo
     const [hStart, setHStart] = useState('00');
     const [mStart, setMStart] = useState('00');
     const [hEnd, setHEnd] = useState('00');
     const [mEnd, setMEnd] = useState('00');
 
-    // Estados para control del modal
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [deleteTarget, setDeleteTarget] = useState<{ type: 'task' | 'interval'; id: string; } | null>(null);
     const [deleteMessage, setDeleteMessage] = useState('');
@@ -234,7 +234,6 @@ const TaskCard = ({ task, onUpdate, currentDate }: TaskCardProps) => {
         }
     };
 
-    // Estilos sobrios
     const inputStyle = "w-full p-2 border bg-gray-50 border-gray-300 rounded-lg text-slate-900 focus:ring-indigo-500 focus:border-indigo-500 transition-colors";
     const isSoporte = task.TYPE === 'SOPORTE';
 
@@ -245,11 +244,6 @@ const TaskCard = ({ task, onUpdate, currentDate }: TaskCardProps) => {
         : isSoporte
             ? 'bg-gray-50 border-l-4 border-pink-300' 
             : 'bg-gray-50 border-l-4 border-green-300'; 
-
-    // LÓGICA NUEVA: Encontrar la hora de término más alta entre los intervalos
-    const latestEndTime = task.intervals.reduce((max, interval) => {
-        return interval.TIME_END > max ? interval.TIME_END : max;
-    }, '');
 
     return (
         <div className="flex flex-row gap-4 p-4 border border-gray-200 rounded-xl bg-white text-slate-900 shadow-md">
@@ -329,15 +323,15 @@ const TaskCard = ({ task, onUpdate, currentDate }: TaskCardProps) => {
                 </div>
             </div>
 
-            {/* 2. Lista de Intervalos (Modificado para resaltar el último) */}
+            {/* 2. Lista de Intervalos */}
             <div className="w-1/4 space-y-2 max-h-72 overflow-y-auto pr-2">
                 <h5 className="font-semibold text-gray-700 border-b border-gray-200 pb-1 sticky top-0 bg-white z-10 text-sm">Intervalos ({task.intervals.length})</h5>
                 {task.intervals.length > 0 ? (
                     task.intervals
                         .sort((a, b) => (a.ID as string).localeCompare(b.ID as string)) 
                         .map(interval => {
-                            // Identificar si es el último
-                            const isLatest = interval.TIME_END === latestEndTime;
+                            // Identificar si es el último GLOBAL (comparando con la prop)
+                            const isLatest = interval.ID === latestGlobalIntervalId;
                             
                             // Estilo Condicional
                             const intervalStyle = isLatest
