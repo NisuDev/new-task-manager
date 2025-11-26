@@ -10,6 +10,14 @@ interface TaskCardProps {
     currentDate: string;
 }
 
+// SVG Icons for clean design (replacing emojis)
+const EditIcon = (props: React.SVGProps<SVGSVGElement>) => <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>;
+const SaveIcon = (props: React.SVGProps<SVGSVGElement>) => <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4v4m0 0l-1-1m1 1l1-1m-1 1l-1 1m1-1l1 1m-1 1v-4m0 0l-1-1m1 1l1-1m-1 1l-1 1m1-1l1 1m-1 1v-4m0 0l-1-1m1 1l1-1m-1 1l-1 1m1-1l1 1m-1 1v-4m0 0l-1-1m1 1l1-1m-1 1l-1 1m1-1l1 1" /></svg>;
+const DeleteIcon = (props: React.SVGProps<SVGSVGElement>) => <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>;
+const XIcon = (props: React.SVGProps<SVGSVGElement>) => <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>;
+const actionButtonStyle = "p-2 rounded-lg transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-50";
+
+
 // Sub-component for clean time input rendering
 interface TimeInputProps {
     label: string;
@@ -107,44 +115,68 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onUpdate, currentDate }) => {
         }
     };
 
-    // Reemplaza deleteTask() (y src/deleteTask.php)
+    // FIX: Se garantiza la eliminación de intervalos primero y se mejora el manejo de errores/logs.
     const handleDeleteTask = async (taskId: number) => {
-        if (!window.confirm('¿Está seguro de eliminar esta tarea y todos sus intervalos?')) {
+        if (!window.confirm('¿Está seguro de eliminar esta tarea y todos sus intervalos? (Esta acción no se puede deshacer)')) {
             return;
         }
 
         try {
-            // Nota: Se requiere ON DELETE CASCADE en la tabla 'intervals' o eliminar intervalos primero.
-            const { error } = await supabase
+            // 1. Eliminar intervalos asociados
+            console.log(`[DELETE] Intentando eliminar intervalos para TASK_ID: ${taskId}`);
+            const { error: intervalError, data: intervalData } = await supabase
+                .from('intervals')
+                .delete()
+                .eq('TASK_ID', taskId);
+            
+            if (intervalError) throw intervalError;
+            console.log("[DELETE] Intervalos eliminados con éxito. Data:", intervalData);
+            
+            // 2. Eliminar la tarea
+            console.log(`[DELETE] Intentando eliminar tarea con ID: ${taskId}`);
+            const { error: taskError, data: taskData } = await supabase
                 .from('task')
                 .delete()
                 .eq('ID', taskId); 
                 
-            if (error) throw error;
+            if (taskError) throw taskError;
+            console.log("[DELETE] Tarea eliminada con éxito. Data:", taskData);
+
+
+            alert('Tarea eliminada con éxito.');
             onUpdate(currentDate); 
             
         } catch (error: any) {
-            alert('ERROR al eliminar tarea: ' + error.message);
+            // MEJORA DE DEBUGGING: Muestra el error en la consola y un mensaje útil sobre RLS
+            console.error('[CRITICAL ERROR] Fallo en handleDeleteTask:', error);
+            alert('ERROR al eliminar tarea: ' + (error?.message || 'Error desconocido. **VERIFIQUE SU CONSOLA** y sus políticas RLS.'));
         }
     };
     
-    // Reemplaza deleteInterval() (y src/deleteInterval.php)
+    // FIX: Se añade alerta de éxito y mejora en el log de error.
     const handleDeleteInterval = async (intervalId: number) => {
         if (!window.confirm('¿Está seguro de eliminar este intervalo?')) {
             return;
         }
 
         try {
-            const { error } = await supabase
+            console.log(`[DELETE] Intentando eliminar intervalo con ID: ${intervalId}`);
+            const { error, data } = await supabase
                 .from('intervals')
                 .delete()
                 .eq('ID', intervalId); 
                 
             if (error) throw error;
+            console.log("[DELETE] Intervalo eliminado con éxito. Data:", data);
+
+            // FEEDBACK: Alerta de éxito añadida
+            alert('Intervalo eliminado con éxito.');
             onUpdate(currentDate); 
             
         } catch (error: any) {
-            alert('ERROR al eliminar intervalo: ' + error.message);
+            // MEJORA DE DEBUGGING: Muestra el error en la consola y un mensaje útil sobre RLS
+            console.error('[CRITICAL ERROR] Fallo en handleDeleteInterval:', error);
+            alert('ERROR al eliminar intervalo: ' + (error?.message || 'Error desconocido. **VERIFIQUE SU CONSOLA** y sus políticas RLS.'));
         }
     };
 
@@ -181,38 +213,50 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onUpdate, currentDate }) => {
 
     // Estilos sobrios
     const inputStyle = "w-full p-2 border bg-gray-50 border-gray-300 rounded-lg text-slate-900 focus:ring-indigo-500 focus:border-indigo-500 transition-colors";
-    const iconStyle = "w-5 h-5 text-gray-500 hover:text-indigo-600 transition-colors";
 
+    // Estilo de tarjeta: fondo blanco, borde izquierdo para destacar tipo/estado.
+    const typeColor = task.TYPE === 'SOPORTE' ? 'pink' : 'green';
 
-    // Estilo de tarjeta simple, fondo blanco, borde izquierdo para destacar tipo/estado.
-    const taskColor = task.TYPE === 'SOPORTE' 
-        ? (task.JOINED 
-            ? 'border-l-4 border-pink-500' 
-            : 'border-l-4 border-pink-300'
-        )
-        : (task.JOINED 
-            ? 'border-l-4 border-green-500' 
-            : 'border-l-4 border-green-300'
-        );
+    // NEW: Visual feedback for JOINED status (darker background and stronger border)
+    const taskStatusStyle = task.JOINED 
+        ? `bg-${typeColor}-100 border-l-4 border-${typeColor}-600 shadow-md` // Highlighted when JOINED
+        : `bg-gray-50 border-l-4 border-${typeColor}-300`; // Subtle when not JOINED
 
 
     return (
         <div className="flex flex-row gap-4 p-4 border border-gray-200 rounded-xl bg-white text-slate-900 shadow-md">
             
             {/* 1. Tarjeta Principal (TASK) */}
-            <div className={`flex-shrink-0 w-1/2 p-4 rounded-lg bg-gray-50 ${taskColor}`}>
+            <div className={`flex-shrink-0 w-1/2 p-4 rounded-lg ${taskStatusStyle} transition-all duration-300`}>
                 
                 <div className="flex justify-between items-start mb-4">
                     
-                    {/* Control Icons */}
+                    {/* Control Buttons (Replaced Emojis with Icons & Buttons) */}
                     <div className="flex space-x-3 text-lg">
-                        <i onClick={() => setIsEditing(!isEditing)} className={`cursor-pointer ${iconStyle} ${isEditing ? 'text-red-600' : ''}`} title={isEditing ? 'Cancelar edición' : 'Editar tarea'}>
-                            {isEditing ? '✖️' : '✏️'}
-                        </i>
+                        <button 
+                            onClick={() => setIsEditing(!isEditing)} 
+                            className={`${actionButtonStyle} ${isEditing ? 'bg-red-50 text-red-600 hover:bg-red-100' : 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100'}`} 
+                            title={isEditing ? 'Cancelar edición' : 'Editar tarea'}
+                        >
+                            {isEditing ? <XIcon className="w-5 h-5" /> : <EditIcon className="w-5 h-5" />}
+                        </button>
+
                         {isEditing && (
                             <>
-                                <i onClick={handleSaveModify} className={`cursor-pointer text-green-600 hover:text-green-500 transition-colors`} title='Guardar cambios'>💾</i>
-                                <i onClick={() => handleDeleteTask(task.ID)} className={`cursor-pointer text-red-600 hover:text-red-500 transition-colors`} title='Eliminar tarea'>🗑️</i>
+                                <button 
+                                    onClick={handleSaveModify} 
+                                    className={`${actionButtonStyle} bg-green-50 text-green-600 hover:bg-green-100`} 
+                                    title='Guardar cambios'
+                                >
+                                    <SaveIcon className="w-5 h-5" />
+                                </button>
+                                <button 
+                                    onClick={() => handleDeleteTask(task.ID)} 
+                                    className={`${actionButtonStyle} bg-red-50 text-red-600 hover:bg-red-100`} 
+                                    title='Eliminar tarea'
+                                >
+                                    <DeleteIcon className="w-5 h-5" />
+                                </button>
                             </>
                         )}
                     </div>
@@ -249,7 +293,14 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onUpdate, currentDate }) => {
                 
                 {/* JOINED Toggle */}
                 <div className="flex items-center pt-3 border-t border-gray-200">
-                    <input type="checkbox" checked={task.JOINED} onChange={handleJoinedToggle} className="w-4 h-4 text-indigo-600 bg-white border-gray-300 rounded focus:ring-indigo-500 cursor-pointer" id={`joined-${task.ID}`}/>
+                    <input 
+                        type="checkbox" 
+                        checked={task.JOINED} 
+                        onChange={handleJoinedToggle} 
+                        // Note: Tailwind requires full class strings to be present, using the defined colors
+                        className={`w-4 h-4 text-indigo-600 bg-white border-gray-300 rounded focus:ring-indigo-500 cursor-pointer checked:bg-${typeColor}-500 checked:border-transparent`} 
+                        id={`joined-${task.ID}`}
+                    />
                     <label htmlFor={`joined-${task.ID}`} className="ml-2 text-sm font-medium text-slate-800">
                         Ingresado
                     </label>
@@ -276,7 +327,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onUpdate, currentDate }) => {
                                         className="text-red-600 hover:text-red-500 transition-colors"
                                         title="Eliminar Intervalo"
                                     >
-                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                                        <DeleteIcon className="h-4 w-4" />
                                     </button>
                                 </div>
                             </div>
